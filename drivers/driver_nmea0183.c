@@ -3744,10 +3744,12 @@ static gps_mask_t processPQTMINS(int count, char *field[],
     case 2: /* GNSS + DR mode, DR calibrated */
         session->newdata.status  = STATUS_GNSSDR;
         session->newdata.mode = MODE_3D;
+        mask |= REPORT_IS;
         break;
     case 3: /* DR only mode */
         session->newdata.status  = STATUS_DR;
         session->newdata.mode = MODE_2D;    
+        mask |= REPORT_IS;
         break;
     default:
         session->newdata.status  = STATUS_UNK;
