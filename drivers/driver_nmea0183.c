@@ -3645,6 +3645,207 @@ static gps_mask_t processSTI(int count, char *field[],
     return mask;
 }
 
+/*
+ * The following define needs to be part of the configuration
+ * and will end up in include/gpsd_config.h - which in
+ * turn warns not to "hand-hack". Leaving here for now.
+ */
+
+/* include Quectel Dead-Reckoning */
+#define QUECTEL_ENABLE 1
+
+#ifdef QUECTEL_ENABLE
+
+/*
+ * Quectel PQTMINS / $PQTMSOL
+ *
+ * Navigation results
+ *
+ * $PQTMSOL,<Timestamp>,<SolType>,<Lat>,<Lon>,<Height>,<VEL_X>,<VEL_Y>,<VEL_Z>,<Roll>,<Pitch>,<Heading>*<Checksum><CR><LF> 
+ *
+ *  <Timestamp> Numeric ms      Milliseconds since turn on. 32-bit unsigned integer.
+ *  <SolType>   Numeric         Solution type.
+ *                                  0 = DR not ready, roll and pitch ready. 
+ *                                  1 = GNSS, Roll, Pitch and Relative Heading ready, DR not ready. 
+ *                                  2 = GNSS + DR mode, DR calibrated. 
+ *                                  3 = DR only mode. 
+ *  <Lat>       Numeric Degree
+ *  <Lon>       Numeric Degree
+ *  <Height>    Numeric Meter
+ *  <VEL_X>     Numeric m/s     (X-axis North)
+ *  <VEL_Y>     Numeric m/s     (Y-axis East)
+ *  <VEL_Z>     Numeric m/s     (Z-axis Down)
+ *  <Roll>      Numeric Degree  (Roll angle)
+ *  <Pitch>     Numeric Degree  (Pitch angle)
+ *  <Heading>   Numeric Degree  (Heading angle)
+ *
+ * Note: All angles are scaled from -180.0 to 179.9 with a wrap around to 0.0 at +180.0.
+ *    -180.0 = S
+ *     180.0/0.0 = N
+ *    +90.0 = East
+ *    -90.0 = West
+ *
+ * Example: $PQTMINS,1918570,1,50.047965000,19.958976200,250.544000,,,,-0.584531,18.488698,33.769880*4B
+ *
+ */
+static gps_mask_t processPQTMINS(int count, char *field[],
+                              struct gps_device_t *session)
+{
+    gps_mask_t mask = ONLINE_SET;
+
+    if (count < 12)
+            return mask;
+
+    if ('\0' == field[1][0] ||      /* <Timestamp> */
+        '\0' == field[2][0] ||      /* <SolType> */
+        '\0' == field[3][0] ||      /* <Lat> */
+        '\0' == field[4][0] ||      /* <Lon> */
+        '\0' == field[5][0] ||      /* <Height> */
+        '\0' == field[9][0] ||      /* <Roll> */
+        '\0' == field[10][0] ||     /* <Pitch> */
+        '\0' == field[11][0]) {     /* <Heading> */
+        return 1;
+    }
+
+    uint8_t  soltype = atoi(field[2]);
+
+    session->newdata.latitude  = safe_atof(field[3]);
+    session->newdata.longitude = safe_atof(field[4]);
+    session->newdata.altitude  = safe_atof(field[5]);
+    mask |= LATLON_SET;
+
+    if ('\0' != field[6][0] &&      /* <VEL_N> */
+       '\0' != field[7][0] &&      /* <VEL_E> */
+       '\0' != field[8][0] ) {     /* <VEL_D> */
+       session->newdata.NED.velN = safe_atof(field[6]);
+       session->newdata.NED.velE = safe_atof(field[7]);
+       session->newdata.NED.velD = safe_atof(field[8]);
+       mask |= NED_SET;
+    } else {
+       session->newdata.NED.velN = 0.0;
+       session->newdata.NED.velE = 0.0;
+       session->newdata.NED.velD = 0.0;
+    }
+
+    session->gpsdata.attitude.roll = safe_atof(field[9]);
+    session->gpsdata.attitude.pitch = safe_atof(field[10]);
+    session->gpsdata.attitude.heading = safe_atof(field[11]);
+    mask |= ATTITUDE_SET;
+
+    switch (soltype) {
+    case 0: /* DR not ready; roll and pitch ready */
+        session->newdata.status  = STATUS_UNK;
+        session->newdata.mode = MODE_NO_FIX;
+        break;
+    case 1: /* GNSS, Roll, pitch, heading ready; DR NOT ready */
+        session->newdata.status  = STATUS_GPS;
+        session->newdata.mode = MODE_2D;
+        break;
+    case 2: /* GNSS + DR mode, DR calibrated */
+        session->newdata.status  = STATUS_GNSSDR;
+        session->newdata.mode = MODE_3D;
+        break;
+    case 3: /* DR only mode */
+        session->newdata.status  = STATUS_DR;
+        session->newdata.mode = MODE_2D;    
+        break;
+    default:
+        session->newdata.status  = STATUS_UNK;
+        session->newdata.mode = MODE_NO_FIX;
+        break;
+    }
+
+    mask |= STATUS_SET | MODE_SET;
+
+    GPSD_LOG( LOG_DATA,&session->context->errout,
+        "PQTMINS: time=%d, sol=%d, lat=%.9f lon=%.9f alt=%.2f velN=%.2f, velE=%.2f, velD=%.2f, roll=%.2f, pitch=%.2f, heading=%.2f\n",
+        atoi(field[1]), soltype,
+        session->newdata.latitude,
+        session->newdata.longitude,
+        session->newdata.altitude,
+        session->newdata.NED.velN,
+        session->newdata.NED.velE,
+        session->newdata.NED.velD,
+        session->gpsdata.attitude.roll,
+        session->gpsdata.attitude.pitch,
+        session->gpsdata.attitude.heading
+    );
+
+    return mask;
+}
+
+/*
+ * Quectel PQTMIMU
+ * $PQTMIMU,<Timestamp>,<ACC_X>,<ACC_Y>,<ACC_Z>,<AngRate_X>,<AngRate_Y>,<AngRate_Z>,<TickCount>,<LastTick_Timestamp>*<Checksum><CR><LF> 
+ *
+ * Navigation results
+ *
+ *  <Timestamp>           Numeric ms    Milliseconds since turn on. 32-bit unsigned integer.
+ *  <ACC_X>               Numeric G     X-Acceleration
+ *  <ACC_Y>               Numeric G     Y-Acceleration
+ *  <ACC_Z>               Numeric G     Z-Acceleration
+ *  <AngRate_X>           Numeric deg/s X-Angular Rate
+ *  <AngRate_Y>           Numeric deg/s Y-Angular Rate
+ *  <AngRate_Z>           Numeric deg/s Z-Angular Rate
+ *  <TickCount>           Numeric       Cumulative ticks
+ *  <LastTick_Timestamp>  Numeric ms    Last tick timestamp
+ *
+ *  Example: $PQTMIMU,42634,-0.006832,-0.022814,1.014552,0.315000,-0.402500,-0.332500,0,0*55
+ *
+ */
+static gps_mask_t processPQTMIMU(int count, char *field[],
+                              struct gps_device_t *session)
+{
+    gps_mask_t mask = ONLINE_SET;
+
+    if (count < 8)
+            return mask;
+
+    if ('\0' != field[2][0] &&      /* <ACC_X> */
+        '\0' != field[3][0] &&      /* <ACC_Y> */
+        '\0' != field[4][0] ) {     /* <ACC_Z> */
+        session->gpsdata.attitude.acc_x = safe_atof(field[2]);
+        session->gpsdata.attitude.acc_y = safe_atof(field[3]);
+        session->gpsdata.attitude.acc_z = safe_atof(field[4]);
+        mask |= ATTITUDE_SET;
+    } else {
+        session->gpsdata.attitude.acc_x = 0.0;
+        session->gpsdata.attitude.acc_y = 0.0;
+        session->gpsdata.attitude.acc_z = 0.0;
+    }
+
+    if ('\0' != field[5][0] &&      /* <Angular Rate X> */
+        '\0' != field[6][0] &&      /* <Angular Rate Y> */
+        '\0' != field[7][0] ) {     /* <Angular Rate Z> */
+        /* NOTE - not sure about using gyro for Angular Rates? (aka Velocity)
+    * WARN - gyro x,y,z expect units as deg/s^2 which is Angular Acceleration
+    */
+        session->gpsdata.attitude.gyro_x = safe_atof(field[5]);
+        session->gpsdata.attitude.gyro_y = safe_atof(field[6]);
+        session->gpsdata.attitude.gyro_z = safe_atof(field[7]);
+        mask |= ATTITUDE_SET;
+    } else {
+        session->gpsdata.attitude.gyro_x = 0.0;
+        session->gpsdata.attitude.gyro_y = 0.0;
+        session->gpsdata.attitude.gyro_z = 0.0;
+    }
+
+    GPSD_LOG( LOG_DATA,&session->context->errout,
+        "PQTMIMU: time=%d, acc_x=%.6f acc_y=%.6f acc_z=%.6f gyro_x=%.6f gyro_y=%.6f gyro_z=%.6f\n",
+        atoi(field[1]),
+        session->gpsdata.attitude.acc_x,
+        session->gpsdata.attitude.acc_y,
+        session->gpsdata.attitude.acc_z,
+        session->gpsdata.attitude.gyro_x,
+        session->gpsdata.attitude.gyro_y,
+        session->gpsdata.attitude.gyro_z
+    );
+
+    return mask;
+}
+
+#endif
+
 /**************************************************************************
  *
  * Entry points begin here
@@ -3765,6 +3966,10 @@ gps_mask_t nmea_parse(char *sentence, struct gps_device_t * session)
         {"XDR", 0,  false, NULL},       /* ignore $HCXDR, IMU? */
         {"XTE", 0,  false, NULL},       /* ignore Cross-Track Error */
         {"ZDA", 4,  false, processZDA},
+#ifdef QUECTEL_ENABLE
+        {"PQTMINS", 12, false, processPQTMINS}, /* $PQTMINS Quectel */
+        {"PQTMIMU",  8, false, processPQTMIMU}, /* $PQTMIMU Quectel */
+#endif /* QUECTEL_ENABLE */
         {NULL, 0,  false, NULL},        // no more
     };
 
