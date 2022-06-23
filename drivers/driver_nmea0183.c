@@ -3684,8 +3684,11 @@ static gps_mask_t processSTI(int count, char *field[],
  *     180.0/0.0 = N
  *    +90.0 = East
  *    -90.0 = West
- *
- * Example: $PQTMINS,1918570,1,50.047965000,19.958976200,250.544000,,,,-0.584531,18.488698,33.769880*4B
+ * 
+ * Example:
+ * $PQTMINS,1918570,1,50.047965000,19.958976200,250.544000,,,,-0.584531,18.488698,33.769880*4B
+ * or
+ * $PQTMINS,1313867,2,50.047475906,19.959435690,263.702605,0.000000,0.000000,0.000000,-1.770574,6.623167,27.461326*61
  *
  */
 static gps_mask_t processPQTMINS(int count, char *field[],
@@ -3748,7 +3751,7 @@ static gps_mask_t processPQTMINS(int count, char *field[],
         break;
     case 3: /* DR only mode */
         session->newdata.status  = STATUS_DR;
-        session->newdata.mode = MODE_2D;    
+        session->newdata.mode = MODE_2D;
         mask |= REPORT_IS;
         break;
     default:
