@@ -3733,7 +3733,6 @@ static gps_mask_t processPQTMINS(int count, char *field[],
     session->gpsdata.attitude.roll = safe_atof(field[9]);
     session->gpsdata.attitude.pitch = safe_atof(field[10]);
     session->gpsdata.attitude.heading = safe_atof(field[11]);
-    mask |= ATTITUDE_SET;
 
     switch (soltype) {
     case 0: /* DR not ready; roll and pitch ready */
