@@ -143,10 +143,11 @@ extern "C" {
  * The current hog champion is the Skytraq S2525F8 which emits
  * a 100-character PSTI message.
  *
- * Quectel LC29D emits PQTMINS which can have size of 115 characters.
- * This size is achieved only when the VEL_N, VEL_E, VEL_D fields are filled in.
+ * Quectel LC29D emits PQTMINS which can have size of 137 characters.
+ * This size is achieved when the VEL_N, VEL_E, VEL_D fields are filled in,
+ * and if all values are negative, with a "-" sign.
  */
-#define NMEA_MAX        118     /* max length of NMEA sentence */
+#define NMEA_MAX        160     /* max length of NMEA sentence */
 #define NMEA_MAX_FLD    100     // max fields in an NMEA sentence
 #define NMEA_BIG_BUF    (2*NMEA_MAX+1)  /* longer than longest NMEA sentence */
 
