@@ -431,11 +431,11 @@ void json_tpv_dump(const gps_mask_t changed, const struct gps_device_t *session,
     if (0 != (changed & NAVDATA_SET)) {
         if (0 != isfinite(gpsdata->fix.wanglem)){
             str_appendf(reply, replylen,
-                        ",\"wanglem\":%.1f", gpsdata->fix.wanglem);
+                        ",\"wanglem\":%.9f", gpsdata->fix.wanglem);
         }
         if (0 != isfinite(gpsdata->fix.wangler)){
             str_appendf(reply, replylen,
-                        ",\"wangler\":%.1f", gpsdata->fix.wangler);
+                        ",\"wangler\":%.9f", gpsdata->fix.wangler);
         }
         if (0 != isfinite(gpsdata->fix.wanglet)){
             str_appendf(reply, replylen,

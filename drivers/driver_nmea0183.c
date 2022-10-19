@@ -3832,6 +3832,46 @@ static gps_mask_t processPQTMIMU(int count, char *field[],
     return mask;
 }
 
+/*
+ * Quectel PQTMGPS - raw GNSS-only position (no Dead Reckoning).
+ * $PQTMGPS,<Timestamp>,<TOW>,<Lat>,<Lon>,<Altitude>,<Speed>,<Yaw>,<Accuracy>,<HDOP>,<PDOP>,<NumSat>,<FixType>*<Checksum><CR><LF>
+ *
+ * Example:
+ * $PQTMGPS,1619342,230159.000,50.047545700,19.959408200,238.8220,196.8980,0.0060,159.1289,4.0130,0.8600,1.3800,3,22,*52
+ */
+static gps_mask_t processPQTMGPS(int count, char *field[],
+                              struct gps_device_t *session)
+{
+    gps_mask_t mask = ONLINE_SET;
+
+    if (count < 12)
+            return mask;
+
+    if ('\0' == field[1][0] ||      /* <Timestamp> */
+        '\0' == field[2][0] ||      /* <Time of week> */
+        '\0' == field[3][0] ||      /* <Lat> */
+        '\0' == field[4][0]) {      /* <Lon> */
+        return 1;
+    }
+
+    // Push debug GNSS-only position as unused gpsd wind angle variables in gps_fix_t struct.
+    session->newdata.wanglem  = safe_atof(field[3]);
+    session->newdata.wangler = safe_atof(field[4]);
+    mask |= NAVDATA_SET;
+
+    session->newdata.mode = MODE_3D;
+    mask |= MODE_SET;
+
+    GPSD_LOG( LOG_DATA, &session->context->errout,
+        "PQTMGPS: time=%d, lat=%.9f lon=%.9f",
+        atoi(field[1]),
+        session->newdata.wanglem,
+        session->newdata.wangler
+    );
+
+    return mask;
+}
+
 #endif
 
 /**************************************************************************
@@ -3956,7 +3996,8 @@ gps_mask_t nmea_parse(char *sentence, struct gps_device_t * session)
         {"ZDA", 4,  false, processZDA},
 #ifdef QUECTEL_ENABLE
         {"PQTMINS", 12, false, processPQTMINS}, /* $PQTMINS Quectel */
-        {"PQTMIMU",  8, false, processPQTMIMU}, /* $PQTMIMU Quectel */
+        {"PQTMIMU",  8, false, NULL},           /* $PQTMIMU Quectel */
+        {"PQTMGPS", 12, false, processPQTMGPS}, /* $PQTMGPS Quectel */
 #endif /* QUECTEL_ENABLE */
         {NULL, 0,  false, NULL},        // no more
     };
