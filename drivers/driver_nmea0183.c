@@ -3717,19 +3717,6 @@ static gps_mask_t processPQTMINS(int count, char *field[],
     session->newdata.altitude  = safe_atof(field[5]);
     mask |= LATLON_SET;
 
-    if ('\0' != field[6][0] &&      /* <VEL_N> */
-       '\0' != field[7][0] &&      /* <VEL_E> */
-       '\0' != field[8][0] ) {     /* <VEL_D> */
-       session->newdata.NED.velN = safe_atof(field[6]);
-       session->newdata.NED.velE = safe_atof(field[7]);
-       session->newdata.NED.velD = safe_atof(field[8]);
-       mask |= NED_SET;
-    } else {
-       session->newdata.NED.velN = 0.0;
-       session->newdata.NED.velE = 0.0;
-       session->newdata.NED.velD = 0.0;
-    }
-
     session->gpsdata.attitude.roll = safe_atof(field[9]);
     session->gpsdata.attitude.pitch = safe_atof(field[10]);
     session->gpsdata.attitude.heading = safe_atof(field[11]);
@@ -3762,14 +3749,11 @@ static gps_mask_t processPQTMINS(int count, char *field[],
     mask |= STATUS_SET | MODE_SET;
 
     GPSD_LOG( LOG_DATA,&session->context->errout,
-        "PQTMINS: time=%d, sol=%d, lat=%.9f lon=%.9f alt=%.2f velN=%.2f, velE=%.2f, velD=%.2f, roll=%.2f, pitch=%.2f, heading=%.2f\n",
+        "PQTMINS: time=%d, sol=%d, lat=%.9f lon=%.9f alt=%.2f roll=%.2f, pitch=%.2f, heading=%.2f\n",
         atoi(field[1]), soltype,
         session->newdata.latitude,
         session->newdata.longitude,
         session->newdata.altitude,
-        session->newdata.NED.velN,
-        session->newdata.NED.velE,
-        session->newdata.NED.velD,
         session->gpsdata.attitude.roll,
         session->gpsdata.attitude.pitch,
         session->gpsdata.attitude.heading
