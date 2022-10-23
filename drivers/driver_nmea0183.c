@@ -3861,6 +3861,7 @@ static gps_mask_t processPQTMGPS(int count, char *field[],
 
     session->newdata.mode = MODE_3D;
     mask |= MODE_SET;
+    mask |= REPORT_IS;
 
     GPSD_LOG( LOG_DATA, &session->context->errout,
         "PQTMGPS: time=%d, lat=%.9f lon=%.9f",
