@@ -590,7 +590,7 @@ class DaemonInstance(SubprogramInstance):
         # The -b option to suppress hanging on probe returns is needed to cope
         # with OpenBSD (and possibly other non-Linux systems) that don't
         # support anything we can use to implement the FakeGPS.read() method
-        opts = (" -b -N -S %s -F %s %s"
+        opts = (" -N -S %s -F %s %s"
                 % (port, self.control_socket, options))
         # Derive a unique SHM key from the port # to avoid collisions.
         # Use 'Gp' as the prefix to avoid colliding with 'GPSD'.
